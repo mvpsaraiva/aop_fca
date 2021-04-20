@@ -195,37 +195,21 @@ pfca_accessibility <- function(tt_matrix, fun = "binary", time_threshold = 30) {
 
 calculate_access <- function(muni, mode, thresholds = c(15, 30, 45, 60), 
                              jobs = "abs") {
-  ttm <- load_tt_matrix(muni = muni, transport_mode = mode, opportunity = jobs, filtered = FALSE)
+  ttm <- load_tt_matrix(muni = muni, transport_mode = mode, opportunity = jobs, filtered = TRUE)
   
   calculate_distance_access <- function(ttm,
                                         decay_function = "binary", 
-                                        threshold = 15,
-                                        normalised = FALSE) {
+                                        threshold = 15) {
     
     if (decay_function == "binary") {
-      if (normalised) {
-        res <- ttm[tt_median <= threshold, 
-                   .(accessibility = sum(opportunities) / .N), 
-                   by = .(origin)]
-        res[, metric := "norm cumulative"] 
-      } else {
-        res <- ttm[tt_median <= threshold, .(accessibility = sum(opportunities)), by = .(origin)]
-        res[, metric := "abs cumulative"] 
-      }
+      res <- ttm[tt_median <= threshold, .(accessibility = sum(opportunities)), by = .(origin)]
+      res[, metric := "cumulative"] 
     } 
     
     if (decay_function == "gaussian") {
-      if (normalised) {
-        res <- ttm[, .(accessibility = 
-                         sum(opportunities * gaussian_weight(tt_median, b = threshold)) / 
-                         sum(gaussian_weight(tt_median, b = threshold))), 
-                   by = .(origin)]
-        res[, metric := "norm gravity"] 
-      } else {
-        res <- ttm[, .(accessibility = sum(opportunities * gaussian_weight(tt_median, b = threshold))), 
-                   by = .(origin)]
-        res[, metric := "abs gravity"] 
-      }
+      res <- ttm[, .(accessibility = sum(opportunities * gaussian_weight(tt_median, b = threshold))), 
+                 by = .(origin)]
+      res[, metric := "gravity"] 
     } 
     
     res[, fun := decay_function]
@@ -269,10 +253,8 @@ calculate_access <- function(muni, mode, thresholds = c(15, 30, 45, 60),
   fca <- fca[, .(city, mode, metric, jobs, fun, threshold, origin, accessibility)]
   
   dba <- c(
-    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "binary", normalised = FALSE),
-    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "binary", normalised = TRUE),
-    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "gaussian", normalised = FALSE),
-    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "gaussian", normalised = TRUE)
+    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "binary"),
+    map(thresholds, calculate_distance_access, ttm = ttm, decay_function = "gaussian")
   ) %>% 
     rbindlist()
   

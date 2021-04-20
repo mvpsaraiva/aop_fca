@@ -1,0 +1,70 @@
+---
+title: "FCA Accessibility Metrics"
+author: "Saraiva, M."
+date: "20/04/2021"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("tidyverse")
+library("shiny")
+```
+
+```{r include=FALSE}
+access_cor <- read_csv(here::here("data", "access_correlations.csv"))
+```
+
+
+## Correlations
+
+```{r echo=FALSE}
+inputPanel(
+  sliderInput("time_threshold", label = "Time Threshold",
+              min = 15, max = 60, value = 30, step = 15),
+  selectInput("stat", "Statistic",
+              choices = c("ac_mean", "ac_median", "wt_mean", "wt_median"),
+              selected = "ac_mean")
+)
+```
+
+```{r echo=FALSE}
+output$g1 <- renderPlot({
+  
+  access_cor %>%
+  filter(threshold== input$time_threshold) %>%
+  filter(stat == input$stat) %>%
+  mutate(method = paste(metric, fun)) %>% 
+  mutate(metric = factor(metric, c("cumulative", "gravity", 
+                                   "2sfca", "bfca", "pfca"))) %>%
+  mutate(var1 = factor(var1, 
+                       levels = c("abs", "rel"),
+                       labels = c("Access to # Jobs", "Access to % Jobs"))) %>%
+  mutate(var2 = factor(var2,
+                       levels = c("jobs", "population", "ratio", "rel"),
+                       labels = c("# of Jobs", "Population", 
+                                  "Ratio (Jobs/Population)",
+                                  "Access to % Jobs"))) %>%
+  ggplot(aes(x=metric, y=spearman, fill=fun)) +
+  geom_col(position = "dodge") +
+  geom_hline(yintercept = 0) +
+  expand_limits(y=c(-1, 1)) +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set1") +
+  facet_wrap(~var1+var2, ncol=4) +
+  theme(legend.position = "bottom",
+        axis.title = element_blank()) +
+  labs(title="Spearman's rank correlations between accessibility metrics and urban indicators",
+       subtitle = sprintf("by walk, time threshold = %s, correlation to wt. median accessibility", input$time_threshold))
+  
+})
+
+plotOutput("g1", height = "600px")
+
+```
+
+
+
+
+

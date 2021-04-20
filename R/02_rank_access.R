@@ -34,7 +34,7 @@ access_summary <- access_df %>%
             wt_mean = weighted.mean(accessibility, pop_total),
             wt_median = wtd.quantile(accessibility, weights = pop_total, probs = 0.5))
 
-
+write_csv(access_summary, here::here("data", "access_summary.csv"))
 
 # Rank --------------------------------------------------------------------
 
@@ -42,7 +42,10 @@ access_rank <- access_summary %>%
   pivot_longer(ac_mean:wt_median, names_to = "stat", values_to = "value") %>%
   group_by(mode, metric, jobs, fun, threshold, stat) %>%
   arrange(desc(value)) %>%
-  mutate(rank = row_number())
+  mutate(rank = row_number()) %>%
+  arrange(mode, metric, jobs, fun, threshold, stat, rank)
+
+write_csv(access_rank, here::here("data", "access_rank.csv"))
 
 rank_df <- landuse[, .(population = sum(pop_total), jobs = sum(empregos_total)), by = city]
 rank_df <- rank_df %>%
@@ -52,6 +55,8 @@ rank_df <- rank_df %>%
   mutate(rank_jobs = row_number()) %>% 
   arrange(desc(jobs/population)) %>%
   mutate(rank_ratio = row_number()) 
+
+write_csv(rank_df, here::here("data", "cities_rank.csv"))
 
 cities <- (rank_df %>% arrange(rank_pop))$city
 colors <- inlmisc::GetColors(n = 20, reverse = TRUE)
@@ -175,6 +180,8 @@ access_cor <- access_rank %>%
   select(-data, -pearson, -spearman) %>%
   pivot_wider(names_from = method, values_from = value)
 
+write_csv(access_cor, here::here("data", "access_correlations.csv"))
+
 t <- 30
 access_cor %>%
   # filter(var1 == "abs", var2 == "ratio") %>%
@@ -203,12 +210,16 @@ ggsave(filename = here::here("plots", sprintf("access_cor_t%s.png", t)),
 access_cor %>%
   # filter(var1 == "abs", var2 == "ratio") %>%
   filter(threshold==t) %>%
-  filter(stat == "ac_median") %>%
+  filter(stat == "wt_median") %>%
   mutate(method = paste(metric, fun)) %>% 
-  mutate(method = factor(method, levels = c("cumulative binary", "gravity gaussian",
-                                            "2sfca binary", "2sfca gaussian",
-                                            "bfca binary", "bfca gaussian",
-                                            "pfca binary", "pfca gaussian"))) %>%
+  mutate(metric = factor(metric, c("cumulative", "gravity", "2sfca", "bfca", "pfca"))) %>%
+  mutate(var1 = factor(var1, 
+                       levels = c("abs", "rel"),
+                       labels = c("Access to # Jobs", "Access to % Jobs"))) %>%
+  mutate(var2 = factor(var2,
+                       levels = c("jobs", "population", "ratio", "rel"),
+                       labels = c("# of Jobs", "Population", "Ratio (Jobs/Population)",
+                                  "Access to % Jobs"))) %>%
   ggplot(aes(x=metric, y=spearman, fill=fun)) +
   geom_col(position = "dodge") +
   geom_hline(yintercept = 0) +
@@ -219,7 +230,10 @@ access_cor %>%
   theme(legend.position = "bottom",
         axis.title = element_blank()) +
   labs(title="Spearman's rank correlations between accessibility metrics and urban indicators",
-       subtitle = sprintf("by walk, time threshold = %s", t))
+       subtitle = sprintf("by walk, time threshold = %s, correlation to wt. median accessibility", t))
+
+ggsave(filename = here::here("plots", sprintf("access_cor_t30_wt_median.png", t)),
+       width=297, height=210, units="mm", dpi=300)
 
 access_cor %>% 
   ggplot(aes(pearson, spearman)) +
